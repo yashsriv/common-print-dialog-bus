@@ -1,25 +1,58 @@
 #include <gio/gio.h>
 
-#include <fstream>
 #include <iostream>
-#include <string>
+
+#include "../common/common.hpp"
 
 static GDBusNodeInfo *introspection_data = NULL;
 
-std::string read_xml(std::string xml) {
+static void
+respond_to_signal (GDBusConnection *connection,
+                   const gchar *sender_name,
+                   const gchar *object_path,
+                   const gchar *interface_name,
+                   const gchar *signal_name,
+                   GVariant *parameters,
+                   gpointer user_data)
+{
+  std::cout << "Yo" << object_path;
+  // GError *local_error;
+  // local_error = NULL;
+  // g_dbus_connection_emit_signal (connection,
+  //                                sender_name,
+  //                                object_path,
+  //                                interface_name,
+  //                                "RegisterBackend",
+  //                                g_variant_new ("(s)",
+  //                                               "Pong"),
+  //                                &local_error);
+  // g_assert_no_error (local_error);
+}
 
-  std::ifstream xml_file(xml);
-  std::string file_contents;
+static void
+subscribe_to_signal (gpointer data) {
+  GDBusConnection       *connection;
+  guint subscription_id;
 
-  xml_file.seekg(0, std::ios::end);
-  file_contents.reserve(xml_file.tellg());
-  xml_file.seekg(0, std::ios::beg);
+  connection = (GDBusConnection *)data;
 
-  file_contents.assign((std::istreambuf_iterator<char>(xml_file)),
-                       std::istreambuf_iterator<char>());
+  subscription_id = g_dbus_connection_signal_subscribe (connection, // DBus Connection
+                                                        NULL,       // Sender Name
+                                                        NULL, // Sender Interface
+                                                        NULL,  // Signal Name
+                                                        NULL,  // Object Path
+                                                        NULL,  // arg0 behaviour
+                                                        G_DBUS_SIGNAL_FLAGS_NONE, // Signal Flags
+                                                        (GDBusSignalCallback) respond_to_signal,  // Callback Function
+                                                        NULL,
+                                                        NULL);
 
-  return file_contents;
+  g_assert (subscription_id > 0);
 
+
+  while(1) {
+    std::cout << "Thread Running: " <<  subscription_id << std::endl;
+  };
 }
 
 static void
@@ -46,7 +79,9 @@ handle_method_call (GDBusConnection       *connection,
 
 static const GDBusInterfaceVTable interface_vtable =
   {
-    handle_method_call
+    handle_method_call,
+    NULL,
+    NULL
   };
 
 static void
@@ -57,15 +92,18 @@ on_bus_acquired (GDBusConnection *connection,
   guint registration_id;
 
   registration_id = g_dbus_connection_register_object (connection,
-                                                       "/org/openprinting/backend/GooogleCloudPrint",
+                                                       "/org/openprinting/backend/Dummy",
                                                        introspection_data->interfaces[0],
                                                        &interface_vtable,
                                                        NULL,  /* user_data */
                                                        NULL,  /* user_data_free_func */
                                                        NULL); /* GError** */
+
   g_assert (registration_id > 0);
 
-  std::cout << "Bus Acquired: " <<  name << std::endl;
+  g_thread_new(NULL, (GThreadFunc)subscribe_to_signal, connection);
+  std::cout << "Bus Acquired & subscribed: " <<  name << std::endl;
+
 }
 
 static void
@@ -95,7 +133,7 @@ main (int argc, char **argv)
   g_assert (introspection_data != NULL);
 
   owner_id = g_bus_own_name (G_BUS_TYPE_SESSION,
-                             "org.openprinting.backend.google-cloud-print",
+                             "org.openprinting.backend.dummy",
                              G_BUS_NAME_OWNER_FLAGS_NONE,
                              on_bus_acquired,
                              on_name_acquired,

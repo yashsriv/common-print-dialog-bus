@@ -5,5 +5,8 @@
       <arg name="test" type="s" direction="out">
       </arg>
    </method>
+   <signal name='RegisterBackend'>
+     <arg type="s" name="pong" direction="out"/>
+   </signal>
  </interface>
 </node>

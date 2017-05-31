@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+ <interface name="org.openprinting.PrintFrontend">
+   <method name="SendPing">
+   </method>
+   <signal name='GetBackends'>
+     <arg type="s" name="ping" direction="out"/>
+   </signal>
+ </interface>
+</node>
