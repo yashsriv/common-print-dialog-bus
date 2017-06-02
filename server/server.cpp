@@ -1,4 +1,5 @@
 #include <gio/gio.h>
+#include <gio/gunixfdlist.h>
 
 #include <iostream>
 
@@ -15,44 +16,18 @@ respond_to_signal (GDBusConnection *connection,
                    GVariant *parameters,
                    gpointer user_data)
 {
-  std::cout << "Yo" << object_path;
-  // GError *local_error;
-  // local_error = NULL;
-  // g_dbus_connection_emit_signal (connection,
-  //                                sender_name,
-  //                                object_path,
-  //                                interface_name,
-  //                                "RegisterBackend",
-  //                                g_variant_new ("(s)",
-  //                                               "Pong"),
-  //                                &local_error);
-  // g_assert_no_error (local_error);
-}
-
-static void
-subscribe_to_signal (gpointer data) {
-  GDBusConnection       *connection;
-  guint subscription_id;
-
-  connection = (GDBusConnection *)data;
-
-  subscription_id = g_dbus_connection_signal_subscribe (connection, // DBus Connection
-                                                        NULL,       // Sender Name
-                                                        NULL, // Sender Interface
-                                                        NULL,  // Signal Name
-                                                        NULL,  // Object Path
-                                                        NULL,  // arg0 behaviour
-                                                        G_DBUS_SIGNAL_FLAGS_NONE, // Signal Flags
-                                                        (GDBusSignalCallback) respond_to_signal,  // Callback Function
-                                                        NULL,
-                                                        NULL);
-
-  g_assert (subscription_id > 0);
-
-
-  while(1) {
-    std::cout << "Thread Running: " <<  subscription_id << std::endl;
-  };
+  std::cout << "Received Signal GetBackends" << std::endl;
+  GError *local_error;
+  local_error = NULL;
+  g_dbus_connection_emit_signal (connection,
+                                 sender_name,
+                                 "/org/openprinting/backend/Dummy",
+                                 "org.openprinting.PrintBackend",
+                                 "RegisterBackend",
+                                 g_variant_new ("(s)",
+                                                "Pong"),
+                                 &local_error);
+  g_assert_no_error (local_error);
 }
 
 static void
@@ -66,13 +41,38 @@ handle_method_call (GDBusConnection       *connection,
                     gpointer               user_data)
 {
   std::cout << "Method Called: " <<  method_name << std::endl;
-  if (g_strcmp0 (method_name, "Call") == 0)
+  if (g_strcmp0 (method_name, "GetPrinterOptions") == 0)
     {
-      gchar *response;
-      response = g_strdup_printf ("You greeted me. Thanks!");
+      const gchar *uid;
+      gchar *key;
+      gint16 value;
+
+      g_variant_get (parameters, "(&s)", &uid);
+      std::cout << "GetPrinterOptions of Printer having uid: " << uid << std::endl;
+
+      key = g_strdup_printf ("Answer");
+      value = 42;
       g_dbus_method_invocation_return_value (invocation,
-                                             g_variant_new ("(s)", response));
-      g_free (response);
+                                             g_variant_new ("(sn)", key, value));
+      g_free (key);
+    } else if (g_strcmp0 (method_name, "StopListing") == 0)
+    {
+      g_dbus_method_invocation_return_value (invocation, NULL);
+      std::cout << "Stop Listing Printers" << std::endl;
+    } else if (g_strcmp0 (method_name, "PrintFile") == 0)
+    {
+      const gchar *uid;
+      GUnixFDList *fd_list;
+      GDBusMessage *msg;
+      gint fd;
+      GError *error;
+      error = NULL;
+      g_variant_get (parameters, "(&s)", &uid);
+      msg = g_dbus_method_invocation_get_message(invocation);
+      fd_list = g_dbus_message_get_unix_fd_list (msg);
+      fd = g_unix_fd_list_get (fd_list, 0, &error);
+      g_assert_no_error (error);
+      std::cout << "Print File having fd: " << fd << " to Printer " << uid << std::endl;
     }
 }
 
@@ -85,10 +85,11 @@ static const GDBusInterfaceVTable interface_vtable =
   };
 
 static void
-on_bus_acquired (GDBusConnection *connection,
-                 const gchar     *name,
-                 gpointer         user_data)
+on_name_acquired (GDBusConnection *connection,
+                  const gchar     *name,
+                  gpointer         user_data)
 {
+  std::cout << "Name Acquired: " <<  name << std::endl;
   guint registration_id;
 
   registration_id = g_dbus_connection_register_object (connection,
@@ -101,17 +102,6 @@ on_bus_acquired (GDBusConnection *connection,
 
   g_assert (registration_id > 0);
 
-  g_thread_new(NULL, (GThreadFunc)subscribe_to_signal, connection);
-  std::cout << "Bus Acquired & subscribed: " <<  name << std::endl;
-
-}
-
-static void
-on_name_acquired (GDBusConnection *connection,
-                  const gchar     *name,
-                  gpointer         user_data)
-{
-  std::cout << "Name Acquired: " <<  name << std::endl;
 }
 
 static void
@@ -126,22 +116,43 @@ on_name_lost (GDBusConnection *connection,
 int
 main (int argc, char **argv)
 {
-  guint owner_id;
+  GDBusConnection *connection;
+  GError *error;
   GMainLoop *loop;
+  guint owner_id;
+  guint subscription_id;
+
+  error = NULL;
+  connection = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, &error);
+  g_assert_no_error (error);
+  g_assert (connection != NULL);
 
   introspection_data = g_dbus_node_info_new_for_xml (read_xml("./org.openprinting.PrintBackend.xml").c_str(), NULL);
   g_assert (introspection_data != NULL);
 
-  owner_id = g_bus_own_name (G_BUS_TYPE_SESSION,
+  owner_id = g_bus_own_name_on_connection (connection,
                              "org.openprinting.backend.dummy",
                              G_BUS_NAME_OWNER_FLAGS_NONE,
-                             on_bus_acquired,
                              on_name_acquired,
                              on_name_lost,
                              NULL,
                              NULL);
 
   loop = g_main_loop_new (NULL, FALSE);
+
+  subscription_id = g_dbus_connection_signal_subscribe (connection,                        // DBus Connection
+                                                        NULL,                              // Sender Name
+                                                        "org.openprinting.PrintFrontend",  // Sender Interface
+                                                        "GetBackends",                 // Signal Name
+                                                        NULL,                              // Object Path
+                                                        NULL,                              // arg0 behaviour
+                                                        G_DBUS_SIGNAL_FLAGS_NONE,          // Signal Flags
+                                                        respond_to_signal,                 // Callback Function
+                                                        NULL,
+                                                        NULL);
+
+  g_assert (subscription_id > 0);
+  std::cout << "Subscribed: " <<  subscription_id << std::endl;
   g_main_loop_run (loop);
 
   g_bus_unown_name (owner_id);
