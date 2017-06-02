@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+  <interface name="org.openprinting.PrintBackend">
+
+    <doc:doc>
+      <doc:description>
+        <doc:para>
+          PrintBackend is responsible for listing printers, options
+          and their print jobs.
+        </doc:para>
+      </doc:description>
+    </doc:doc>
+
+    <method name="GetPrinterOptions">
+
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Method called to get advanced options for a particular printer.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+
+      <arg name="uid" type="s" direction="in">
+        <doc:doc>
+          <doc:summary>
+            Unique Printer Identifier for that Backend
+          </doc:summary>
+        </doc:doc>
+      </arg>
+
+      <arg name="options" type="v" direction="out">
+        <doc:doc>
+          <doc:summary>
+            Advanced Options for that printer
+          </doc:summary>
+        </doc:doc>
+      </arg>
+    </method>
+    <method name="StopListing">
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Method to call to stop listing printers when dialog is closed
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </method>
+    <method name="PrintFile">
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Method to print job by passing file descriptor to file
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+      <arg name="uid" type="s" direction="in">
+        <doc:doc>
+          <doc:summary>
+            Printer ID to trigger the print on.
+          </doc:summary>
+        </doc:doc>
+      </arg>
+      <arg name="fd" type="h" direction="in">
+        <doc:doc>
+          <doc:summary>
+            Unix File Descriptor of the file to print.
+          </doc:summary>
+        </doc:doc>
+      </arg>
+    </method>
+    <signal name="RegisterBackend">
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Signal pong sent to register backend to a
+            PrintFrontend in
+            response to GetBackends . Also triggers the listing of printers and their signal emits.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+      <arg type="s" name="pong" direction="out">
+        <doc:doc>
+          <doc:summary>
+              Simple Pong message
+          </doc:summary>
+        </doc:doc>
+      </arg>
+    </signal>
+    <signal name="UpdatePrinter">
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Signal sent to intimate the PrintFrontend about updates in printers / new printers
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+      <arg type="s" name="uid" direction="out">
+        <doc:doc>
+          <doc:summary>
+            Unique Identifier to identify printer in this Backend
+          </doc:summary>
+        </doc:doc>
+      </arg>
+      <arg type="s" name="name" direction="out">
+        <doc:doc>
+          <doc:summary>
+            Display Name for the Printer
+          </doc:summary>
+        </doc:doc>
+      </arg>
+      <arg type="v" name="options" direction="out">
+        <doc:doc>
+          <doc:summary>
+            Printer Options
+          </doc:summary>
+        </doc:doc>
+      </arg>
+    </signal>
+    <signal name="DeletePrinter">
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Signal sent to intimate the PrintFrontend about removed printers
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+      <arg type="s" name="uid" direction="out">
+        <doc:doc>
+          <doc:summary>
+            Unique Identifier to identify printer in this Backend
+          </doc:summary>
+        </doc:doc>
+      </arg>
+    </signal>
+  </interface>
+</node>

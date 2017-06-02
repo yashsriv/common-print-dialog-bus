@@ -1,18 +1,14 @@
 #include <gio/gio.h>
+#include <stdlib.h>
 
-#include <fstream>
-#include <iostream>
-#include <list>
-#include <string>
-
-#include "../common/common.hpp"
-
-struct backend_location {
+struct backend {
   const gchar *dbus_name;
   const gchar *dbus_object;
 };
 
 static GDBusNodeInfo *introspection_data = NULL;
+
+static GArray *backends = NULL;
 
 static void
 handle_method_call (GDBusConnection       *connection,
@@ -24,7 +20,7 @@ handle_method_call (GDBusConnection       *connection,
                     GDBusMethodInvocation *invocation,
                     gpointer               user_data)
 {
-  std::cout << "Method Called: " <<  method_name << std::endl;
+  g_message("Method Called: %s", method_name);
   if (g_strcmp0 (method_name, "Ping") == 0)
     {
       GError *local_error;
@@ -38,7 +34,7 @@ handle_method_call (GDBusConnection       *connection,
                                                     "Ping"),
                                      &local_error);
       g_assert_no_error (local_error);
-      std::cout << "Emitted Signal GetBackends" << std::endl;
+      g_message("Emitted Signal GetBackends");
     }
 }
 
@@ -49,9 +45,6 @@ static const GDBusInterfaceVTable interface_vtable =
     NULL
   };
 
-static std::list<backend_location>
-backends;
-
 static void
 got_signal (GDBusConnection          *connection,
                      const gchar     *sender_name,
@@ -61,11 +54,11 @@ got_signal (GDBusConnection          *connection,
                      GVariant        *parameters,
                      gpointer         user_data)
 {
-  std::cout << "Received " << signal_name << " from " << object_path << " " << sender_name << std::endl;
+  g_message("Received %s from %s at %s", signal_name, sender_name, object_path);
   if (g_strcmp0 (signal_name, "RegisterBackend") == 0)
   {
-    backend_location b = { sender_name, object_path };
-    backends.push_front(b);
+    struct backend b = { sender_name, object_path };
+    g_array_append_val(backends, b);
   } else if (g_strcmp0 (signal_name, "UpdatePrinter") == 0)
   {
 
@@ -80,10 +73,10 @@ on_name_acquired (GDBusConnection *connection,
                   gpointer         user_data)
 {
   GError *local_error;
-
-  std::cout << "Name Acquired: " <<  name << std::endl;
-
   guint registration_id;
+
+  g_message("Name Acquired %s", name);
+
 
   registration_id = g_dbus_connection_register_object (connection,
                                                        "/org/openprinting/frontend/Dummy",
@@ -105,7 +98,7 @@ on_name_acquired (GDBusConnection *connection,
                                                 "Ping"),
                                  &local_error);
   g_assert_no_error (local_error);
-  std::cout << "Emitted Signal GetBackends" << std::endl;
+  g_message("Emitted Signal GetBackends");
 
 }
 
@@ -114,7 +107,7 @@ on_name_lost (GDBusConnection *connection,
               const gchar     *name,
               gpointer         user_data)
 {
-  std::cout << "Name Lost: " <<  name << std::endl;
+  g_message("Name Lost: %s", name);
   exit (1);
 }
 
@@ -124,6 +117,7 @@ main (int argc, char **argv)
   GDBusConnection *connection;
   GError *error;
   GMainLoop *loop;
+  gchar* contents;
   guint owner_id;
   guint subscription_id;
 
@@ -132,8 +126,14 @@ main (int argc, char **argv)
   g_assert_no_error (error);
   g_assert (connection != NULL);
 
-  introspection_data = g_dbus_node_info_new_for_xml (read_xml("./org.openprinting.PrintFrontend.xml").c_str(), NULL);
+  error = NULL;
+  g_file_get_contents ("./org.openprinting.PrintFrontend.xml", &contents, NULL, &error);
+  g_assert_no_error (error);
+  g_assert (contents != NULL);
+
+  introspection_data = g_dbus_node_info_new_for_xml (contents, NULL);
   g_assert (introspection_data != NULL);
+  g_free(contents);
 
   owner_id = g_bus_own_name_on_connection (connection,
                                            "org.openprinting.frontend.dummy",
@@ -142,7 +142,7 @@ main (int argc, char **argv)
                                            on_name_lost,
                                            NULL,
                                            NULL);
-
+  backends = g_array_new(FALSE, FALSE, sizeof(struct backend));
   loop = g_main_loop_new (NULL, FALSE);
   subscription_id = g_dbus_connection_signal_subscribe (connection,                       // DBus Connection
                                                         NULL,                             // Sender Name
@@ -156,7 +156,6 @@ main (int argc, char **argv)
                                                         NULL);
 
   g_assert (subscription_id > 0);
-  std::cout << "Subscribed: " <<  subscription_id << std::endl;
   g_main_loop_run (loop);
 
   g_bus_unown_name (owner_id);

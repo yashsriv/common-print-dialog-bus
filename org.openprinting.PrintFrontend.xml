@@ -1,38 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
   <interface name="org.openprinting.PrintFrontend">
-    <doc:doc>
-      <doc:description>
-        <doc:para>
-          PrintFrontend is responsible for contacting the Backends
-        </doc:para>
-      </doc:description>
-    </doc:doc>
-
     <method name="Ping">
-      <doc:doc>
-        <doc:description>
-          <doc:para>
-            Method called to trigger rollcall manually
-          </doc:para>
-        </doc:description>
-      </doc:doc>
     </method>
-
     <signal name='GetBackends'>
-      <doc:doc>
-        <doc:description>
-          <doc:para>
-            Signal sent out to all backends as a rollcall.
-          </doc:para>
-        </doc:description>
-      </doc:doc>
       <arg type="s" name="ping" direction="out">
-        <doc:doc>
-          <doc:summary>
-            Simple Ping message
-          </doc:summary>
-        </doc:doc>
       </arg>
     </signal>
   </interface>

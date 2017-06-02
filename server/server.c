@@ -1,9 +1,6 @@
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
-
-#include <iostream>
-
-#include "../common/common.hpp"
+#include <stdlib.h>
 
 static GDBusNodeInfo *introspection_data = NULL;
 
@@ -16,7 +13,7 @@ respond_to_signal (GDBusConnection *connection,
                    GVariant *parameters,
                    gpointer user_data)
 {
-  std::cout << "Received Signal GetBackends" << std::endl;
+  g_message("Received Signal GetBackends");
   GError *local_error;
   local_error = NULL;
   g_dbus_connection_emit_signal (connection,
@@ -40,7 +37,7 @@ handle_method_call (GDBusConnection       *connection,
                     GDBusMethodInvocation *invocation,
                     gpointer               user_data)
 {
-  std::cout << "Method Called: " <<  method_name << std::endl;
+  g_message("Method Called: %s", method_name);
   if (g_strcmp0 (method_name, "GetPrinterOptions") == 0)
     {
       const gchar *uid;
@@ -48,7 +45,7 @@ handle_method_call (GDBusConnection       *connection,
       gint16 value;
 
       g_variant_get (parameters, "(&s)", &uid);
-      std::cout << "GetPrinterOptions of Printer having uid: " << uid << std::endl;
+      g_message("GetPrinterOptions of Printer having uid: %s", uid);
 
       key = g_strdup_printf ("Answer");
       value = 42;
@@ -58,7 +55,7 @@ handle_method_call (GDBusConnection       *connection,
     } else if (g_strcmp0 (method_name, "StopListing") == 0)
     {
       g_dbus_method_invocation_return_value (invocation, NULL);
-      std::cout << "Stop Listing Printers" << std::endl;
+      g_message("Stop Listing Printers");
     } else if (g_strcmp0 (method_name, "PrintFile") == 0)
     {
       const gchar *uid;
@@ -72,7 +69,7 @@ handle_method_call (GDBusConnection       *connection,
       fd_list = g_dbus_message_get_unix_fd_list (msg);
       fd = g_unix_fd_list_get (fd_list, 0, &error);
       g_assert_no_error (error);
-      std::cout << "Print File having fd: " << fd << " to Printer " << uid << std::endl;
+      g_message("Print File having fd: %d to Printer %s", fd, uid);
     }
 }
 
@@ -89,7 +86,7 @@ on_name_acquired (GDBusConnection *connection,
                   const gchar     *name,
                   gpointer         user_data)
 {
-  std::cout << "Name Acquired: " <<  name << std::endl;
+  g_message("Name Acquired: %s", name);
   guint registration_id;
 
   registration_id = g_dbus_connection_register_object (connection,
@@ -109,7 +106,7 @@ on_name_lost (GDBusConnection *connection,
               const gchar     *name,
               gpointer         user_data)
 {
-  std::cout << "Name Lost: " <<  name << std::endl;
+  g_message("Name Lost: %s", name);
   exit (1);
 }
 
@@ -119,6 +116,7 @@ main (int argc, char **argv)
   GDBusConnection *connection;
   GError *error;
   GMainLoop *loop;
+  gchar* contents;
   guint owner_id;
   guint subscription_id;
 
@@ -127,8 +125,14 @@ main (int argc, char **argv)
   g_assert_no_error (error);
   g_assert (connection != NULL);
 
-  introspection_data = g_dbus_node_info_new_for_xml (read_xml("./org.openprinting.PrintBackend.xml").c_str(), NULL);
+  error = NULL;
+  g_file_get_contents ("./org.openprinting.PrintBackend.xml", &contents, NULL, &error);
+  g_assert_no_error (error);
+  g_assert (contents != NULL);
+
+  introspection_data = g_dbus_node_info_new_for_xml (contents, NULL);
   g_assert (introspection_data != NULL);
+  g_free(contents);
 
   owner_id = g_bus_own_name_on_connection (connection,
                              "org.openprinting.backend.dummy",
@@ -152,7 +156,6 @@ main (int argc, char **argv)
                                                         NULL);
 
   g_assert (subscription_id > 0);
-  std::cout << "Subscribed: " <<  subscription_id << std::endl;
   g_main_loop_run (loop);
 
   g_bus_unown_name (owner_id);

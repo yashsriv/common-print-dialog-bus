@@ -1,0 +1,43 @@
+* Compilation
+  #+BEGIN_SRC shell
+  $ make
+  #+END_SRC
+
+* Running
+  On one terminal
+  #+BEGIN_SRC shell
+  $ server-prog
+  #+END_SRC
+  On another terminal
+  #+BEGIN_SRC shell
+  $ client-prog
+  #+END_SRC
+
+  The running processes and ther interface can be analysed using =d-feet=
+
+* Print Frontend
+** Signals
+*** GetBackends
+    Sends a DBus signal =GetBackends= to all listening backends so that they
+    might reply and be registered.
+
+* Print Backend
+** Methods
+*** GetPrinterOptions(in 's' uid, out 'v' options)
+    Get Options for printer uniquely identified by =uid=
+*** StopListing()
+    Deregister a frontend from backend
+*** Printfile(in 's' uid, in 'h' fd)
+    Print file identified by file descriptor =fd= to printer =uid=
+** Signals
+*** RegisterBackend('s' pong)
+    Signal sent to frontend as acknowledgement.
+*** UpdatePrinter('s' uid, 's' name, 'v' options)
+    Update information for printer uniquely identified by =uid=
+    with display name =name= and some initial settings =options=
+*** DeletePrinter('s' uid)
+    Remove printer uniquely identified by =uid= by this backend.
+
+* Printer Information on Frontend
+  On the frontend, all printers can have a primary identifier as the tuple
+  =(backend, uid in that backend)=
